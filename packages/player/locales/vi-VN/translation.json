@@ -234,14 +234,6 @@
 						"tiny": "超小"
 					}
 				},
-				"lyricPlayerImplementation": {
-					"description": "Hiện tại có hai phương pháp phát lời bài hát:\n    DOM: Sử dụng phần tử DOM, hiệu ứng hiện tại là tốt nhất, nhưng hiệu năng tiêu thụ cao.\n    Canvas: Sử dụng Canvas, vẫn đang trong quá trình phát triển, tối ưu hóa hiệu năng, nhưng một số hiệu ứng chi tiết chưa hoàn thiện.",
-					"label": "Triển khai trình phát lời bài hát",
-					"menu": {
-						"dom": "DOM",
-						"dom-slim": "DOM（阉割版）"
-					}
-				},
 				"lyricWordFadeWidth": {
 					"description": "Điều chỉnh độ rộng chuyển đổi dần dần cho từng từ trong lời bài hát, đơn vị là chiều rộng của một ký tự, mặc định là 0.5.\nNếu muốn mô phỏng hiệu ứng của Apple Music cho Android, có thể đặt là 1.\nNếu muốn mô phỏng hiệu ứng của Apple Music cho iPad, có thể đặt là 0.5.\nNếu muốn vô hiệu hóa độ rộng chuyển đổi dần dần cho lời bài hát, có thể đặt là 0.",
 					"label": "Điều chỉnh độ rộng của hiệu ứng làm mờ dần cho từng từ trong lời bài hát"

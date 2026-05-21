@@ -234,14 +234,6 @@
 						"tiny": "超小"
 					}
 				},
-				"lyricPlayerImplementation": {
-					"description": "目前有兩個歌詞播放實現\n- DOM：使用 DOM 元素實現，目前效果最全，但效能開銷大\n- Canvas：使用 Canvas 實現，仍在開發中，性能優異，但部分細節效果不足",
-					"label": "歌詞播放器實現",
-					"menu": {
-						"dom": "DOM",
-						"dom-slim": "DOM（閹割版）"
-					}
-				},
 				"lyricWordFadeWidth": {
 					"description": "調節逐詞歌詞時單字的漸變過渡寬度，單位為全角字的寬度，預設為 0.5。\n如果要模擬 Apple Music for Android 的效果，可以設定為 1。\n如果要模擬 Apple Music for iPad 的效果，可以設定為 0.5。\n如需關閉逐詞歌詞時單字的漸變過渡效果，可設定為 0。",
 					"label": "逐漸漸變寬度"

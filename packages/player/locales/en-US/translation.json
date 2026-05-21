@@ -234,14 +234,6 @@
 						"tiny": "超小"
 					}
 				},
-				"lyricPlayerImplementation": {
-					"description": "Currently, there are two lyrics rendering implementations:\n- DOM: Implemented using DOM elements, currently the most comprehensive, but with high performance overhead\n- Canvas: Implemented using Canvas, still under development, with excellent performance, but some details still need to be improved",
-					"label": "Implementation of the Lyrics Player",
-					"menu": {
-						"dom": "DOM",
-						"dom-slim": "DOM (Stripped)"
-					}
-				},
 				"lyricWordFadeWidth": {
 					"description": "Adjust the gradient transition width of each word in lyrics, measured in the width of a full width character, with a default value of 0.5.\nIf you want to simulate the effect of Apple Music for Android, you can set it to 1.\nIf you want to simulate the effect of Apple Music for iPad, you can set it to 0.5.\nTo turn off the gradient transition effect of each word in lyrics, you can set it to 0.",
 					"label": "Gradient Transition Width of Each Word"
