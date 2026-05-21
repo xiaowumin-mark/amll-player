@@ -9,6 +9,7 @@ lyrics/
 /index.css
 /startup_script.js
 /worker_script.js
+/vendor
 .DS_Store
 target/
 .yarn/cache/

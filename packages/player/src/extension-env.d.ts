@@ -44,6 +44,54 @@ declare interface NetworkSongData extends AnySongData {
 	headers?: Record<string, string>;
 }
 
+declare interface ExtensionRuntimeInfo {
+	kind: "main" | "extension-window";
+}
+
+declare interface ExtensionWindowRuntimeInfo {
+	id: string;
+	label: string;
+}
+
+declare interface ExtensionWindowOptions {
+	title?: string;
+	width?: number;
+	height?: number;
+	x?: number;
+	y?: number;
+	center?: boolean;
+	resizable?: boolean;
+	decorations?: boolean;
+	visible?: boolean;
+	minWidth?: number;
+	minHeight?: number;
+	maxWidth?: number;
+	maxHeight?: number;
+}
+
+declare interface ExtensionWindowHandle {
+	id: string;
+	label: string;
+	close(): Promise<void>;
+	show(): Promise<void>;
+	hide(): Promise<void>;
+	focus(): Promise<void>;
+	center(): Promise<void>;
+	setTitle(title: string): Promise<void>;
+	setSize(width: number, height: number): Promise<void>;
+	setPosition(x: number, y: number): Promise<void>;
+}
+
+declare interface ExtensionWindowsApi {
+	create(
+		id: string,
+		options?: ExtensionWindowOptions,
+	): Promise<ExtensionWindowHandle>;
+	get(id: string): Promise<ExtensionWindowHandle | undefined>;
+	close(id: string): Promise<void>;
+	closeAll(): Promise<void>;
+}
+
 declare interface ExtensionContextEventMap {
 	/**
 	 * 当所有扩展程序都完成了初步脚本加载的操作时触发
@@ -69,6 +117,9 @@ declare interface ExtensionContext extends EventTarget {
 	 * 扩展程序接口的版本号，会随着扩展接口更新而递增数字
 	 */
 	extensionApiNumber: number;
+	runtime: ExtensionRuntimeInfo;
+	window?: ExtensionWindowRuntimeInfo;
+	windows: ExtensionWindowsApi;
 	jotaiStore: ReturnType<typeof createStore>;
 	/**
 	 * 将扩展程序的本地化字段数据注册到 AMLL Player 的国际化上下文中
@@ -93,6 +144,7 @@ declare interface ExtensionContext extends EventTarget {
 		injectPointName: string,
 		injectComponent: ComponentType,
 	): void;
+	registerWindowComponent(windowId: string, component: ComponentType): void;
 	/**
 	 * 注册一个音频源
 	 *
@@ -142,6 +194,11 @@ export type {
 	AnySongData,
 	ExtensionContext,
 	ExtensionContextEventMap,
+	ExtensionRuntimeInfo,
+	ExtensionWindowHandle,
+	ExtensionWindowOptions,
+	ExtensionWindowRuntimeInfo,
+	ExtensionWindowsApi,
 	LocalSongData,
 	NetworkSongData,
 	PlayerStates,

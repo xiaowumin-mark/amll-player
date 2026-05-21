@@ -4,6 +4,7 @@ import type { db } from "../../dexie.ts";
 import type ExtensionEnv from "../../extension-env.ts";
 import i18n from "../../i18n.ts";
 import type { ExtensionMetaState } from "../../states/extensionsAtoms.ts";
+import { createExtensionWindowsApi } from "./windows.ts";
 
 export class PlayerExtensionContext
 	extends EventTarget
@@ -15,6 +16,10 @@ export class PlayerExtensionContext
 	registeredInjectPointComponent: {
 		[injectPointName: string]: ComponentType | undefined;
 	} = {};
+	registeredWindowComponent: {
+		[windowId: string]: ComponentType | undefined;
+	} = {};
+	readonly windows: ExtensionEnv.ExtensionWindowsApi;
 	constructor(
 		readonly playerStates: ExtensionEnv.PlayerStates,
 		readonly amllStates: ExtensionEnv.AMLLStates,
@@ -24,10 +29,15 @@ export class PlayerExtensionContext
 		readonly lyric: typeof import("@applemusic-like-lyrics/lyric"),
 		readonly playerDB: typeof db,
 		readonly http: typeof TauriHttp,
+		readonly runtime: ExtensionEnv.ExtensionRuntimeInfo = {
+			kind: "main",
+		},
+		readonly window?: ExtensionEnv.ExtensionWindowRuntimeInfo,
 	) {
 		super();
+		this.windows = createExtensionWindowsApi(extensionMeta.id);
 	}
-	extensionApiNumber = 1;
+	extensionApiNumber = 2;
 	registerLocale<T>(localeData: { [langId: string]: T }) {
 		for (const [lng, data] of Object.entries(localeData)) {
 			i18n.addResourceBundle(lng, this.extensionMeta.id, data);
@@ -35,6 +45,9 @@ export class PlayerExtensionContext
 	}
 	registerComponent(injectPointName: string, injectComponent: ComponentType) {
 		this.registeredInjectPointComponent[injectPointName] = injectComponent;
+	}
+	registerWindowComponent(windowId: string, component: ComponentType) {
+		this.registeredWindowComponent[windowId] = component;
 	}
 	registerPlayerSource(_idPrefix: string) {
 		console.warn("Unimplemented");
