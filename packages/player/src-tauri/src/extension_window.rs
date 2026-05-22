@@ -62,15 +62,55 @@ pub struct ExtensionWindowState {
 struct ExtensionWindowMaps {
     by_label: HashMap<String, ExtensionWindowInfo>,
     by_extension: HashMap<String, HashSet<String>>,
+    visibility_by_label: HashMap<String, ExtensionWindowVisibility>,
+}
+
+#[derive(Clone, Debug)]
+struct ExtensionWindowVisibility {
+    ready: bool,
+    should_show: bool,
+    should_focus: bool,
+}
+
+impl ExtensionWindowVisibility {
+    fn ready() -> Self {
+        Self {
+            ready: true,
+            should_show: true,
+            should_focus: false,
+        }
+    }
+
+    fn pending(should_show: bool) -> Self {
+        Self {
+            ready: false,
+            should_show,
+            should_focus: should_show,
+        }
+    }
 }
 
 impl ExtensionWindowState {
     fn insert(&self, info: ExtensionWindowInfo) {
+        self.insert_with_visibility(info, ExtensionWindowVisibility::ready());
+    }
+
+    fn insert_pending(&self, info: ExtensionWindowInfo, should_show: bool) {
+        self.insert_with_visibility(info, ExtensionWindowVisibility::pending(should_show));
+    }
+
+    fn insert_with_visibility(
+        &self,
+        info: ExtensionWindowInfo,
+        visibility: ExtensionWindowVisibility,
+    ) {
         let mut maps = self.windows.lock().unwrap();
         maps.by_extension
             .entry(info.extension_id.clone())
             .or_default()
             .insert(info.label.clone());
+        maps.visibility_by_label
+            .insert(info.label.clone(), visibility);
         maps.by_label.insert(info.label.clone(), info);
     }
 
@@ -110,6 +150,7 @@ impl ExtensionWindowState {
     fn remove_label(&self, label: &str) -> Option<ExtensionWindowInfo> {
         let mut maps = self.windows.lock().unwrap();
         let info = maps.by_label.remove(label)?;
+        maps.visibility_by_label.remove(label);
         let should_remove_extension =
             if let Some(labels) = maps.by_extension.get_mut(&info.extension_id) {
                 labels.remove(label);
@@ -121,6 +162,72 @@ impl ExtensionWindowState {
             maps.by_extension.remove(&info.extension_id);
         }
         Some(info)
+    }
+
+    fn visibility(&self, label: &str) -> ExtensionWindowVisibility {
+        self.windows
+            .lock()
+            .unwrap()
+            .visibility_by_label
+            .get(label)
+            .cloned()
+            .unwrap_or_else(ExtensionWindowVisibility::ready)
+    }
+
+    fn request_show(&self, label: &str) -> ExtensionWindowVisibility {
+        let mut maps = self.windows.lock().unwrap();
+        let visibility = maps
+            .visibility_by_label
+            .entry(label.to_string())
+            .or_insert_with(ExtensionWindowVisibility::ready);
+        visibility.should_show = true;
+        visibility.clone()
+    }
+
+    fn request_show_and_focus(&self, label: &str) -> ExtensionWindowVisibility {
+        let mut maps = self.windows.lock().unwrap();
+        let visibility = maps
+            .visibility_by_label
+            .entry(label.to_string())
+            .or_insert_with(ExtensionWindowVisibility::ready);
+        visibility.should_show = true;
+        visibility.should_focus = true;
+        visibility.clone()
+    }
+
+    fn request_hide(&self, label: &str) -> ExtensionWindowVisibility {
+        let mut maps = self.windows.lock().unwrap();
+        let visibility = maps
+            .visibility_by_label
+            .entry(label.to_string())
+            .or_insert_with(ExtensionWindowVisibility::ready);
+        visibility.should_show = false;
+        visibility.should_focus = false;
+        visibility.clone()
+    }
+
+    fn mark_ready(&self, label: &str) -> Option<(bool, ExtensionWindowVisibility)> {
+        let mut maps = self.windows.lock().unwrap();
+        maps.by_label.get(label)?;
+        let visibility = maps
+            .visibility_by_label
+            .entry(label.to_string())
+            .or_insert_with(ExtensionWindowVisibility::ready);
+        let was_ready = visibility.ready;
+        visibility.ready = true;
+        Some((was_ready, visibility.clone()))
+    }
+
+    fn clear_focus_request(&self, label: &str) {
+        if let Some(visibility) = self
+            .windows
+            .lock()
+            .unwrap()
+            .visibility_by_label
+            .get_mut(label)
+        {
+            visibility.should_focus = false;
+        }
     }
 }
 
@@ -372,19 +479,52 @@ fn get_window_for_owner(
 ) -> Result<Option<(ExtensionWindowInfo, WebviewWindow)>, String> {
     let label = make_extension_window_label(extension_id, window_id)?;
     if let Some(win) = app.get_webview_window(&label) {
-        let info = state
-            .get_by_label(&label)
-            .unwrap_or_else(|| ExtensionWindowInfo {
+        let info = if let Some(info) = state.get_by_label(&label) {
+            info
+        } else {
+            let info = ExtensionWindowInfo {
                 extension_id: extension_id.to_string(),
                 window_id: window_id.to_string(),
                 label,
-            });
-        state.insert(info.clone());
+            };
+            state.insert(info.clone());
+            info
+        };
         Ok(Some((info, win)))
     } else {
         state.remove_label(&label);
         Ok(None)
     }
+}
+
+fn apply_window_visibility(
+    app: &AppHandle,
+    state: &ExtensionWindowState,
+    label: &str,
+) -> Result<(), String> {
+    let visibility = state.visibility(label);
+    if !visibility.ready {
+        return Ok(());
+    }
+
+    let Some(win) = app.get_webview_window(label) else {
+        return Ok(());
+    };
+
+    if visibility.should_show {
+        win.show()
+            .map_err(|err| format!("failed to show extension window: {err}"))?;
+        if visibility.should_focus {
+            win.set_focus()
+                .map_err(|err| format!("failed to focus extension window: {err}"))?;
+            state.clear_focus_request(label);
+        }
+    } else {
+        win.hide()
+            .map_err(|err| format!("failed to hide extension window: {err}"))?;
+    }
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -401,8 +541,9 @@ pub async fn extension_window_create(
     let label = make_extension_window_label(&extension_id, &window_id)?;
     if let Some(info) = state.get_by_owner(&extension_id, &window_id)? {
         if let Some(win) = app.get_webview_window(&info.label) {
-            let _ = win.show();
-            let _ = win.set_focus();
+            let _ = win;
+            state.request_show_and_focus(&info.label);
+            apply_window_visibility(&app, &state, &info.label)?;
             return Ok(info);
         }
         state.remove_label(&info.label);
@@ -413,8 +554,9 @@ pub async fn extension_window_create(
             label,
         };
         state.insert(info.clone());
-        let _ = win.show();
-        let _ = win.set_focus();
+        let _ = win;
+        state.request_show_and_focus(&info.label);
+        apply_window_visibility(&app, &state, &info.label)?;
         return Ok(info);
     }
 
@@ -436,7 +578,7 @@ pub async fn extension_window_create(
         .inner_size(width, height)
         .resizable(options.resizable.unwrap_or(true))
         .decorations(options.decorations.unwrap_or(true))
-        .visible(visible);
+        .visible(false);
 
     if has_size_constraints(&options) {
         builder = builder.inner_size_constraints(resolve_size_constraints(&options)?);
@@ -464,16 +606,13 @@ pub async fn extension_window_create(
         .build()
         .map_err(|err| format!("failed to create extension window: {err}"))?;
 
-    if visible {
-        let _ = win.set_focus();
-    }
-
     let info = ExtensionWindowInfo {
         extension_id,
         window_id,
         label,
     };
-    state.insert(info.clone());
+    let _ = win;
+    state.insert_pending(info.clone(), visible);
     Ok(info)
 }
 
@@ -534,8 +673,9 @@ pub fn extension_window_show(
 ) -> Result<(), String> {
     ensure_command_owner(&caller, &extension_id, &state)?;
     if let Some((_, win)) = get_window_for_owner(&app, &state, &extension_id, &window_id)? {
-        win.show()
-            .map_err(|err| format!("failed to show extension window: {err}"))?;
+        let label = win.label().to_string();
+        state.request_show(&label);
+        apply_window_visibility(&app, &state, &label)?;
     }
     Ok(())
 }
@@ -550,8 +690,9 @@ pub fn extension_window_hide(
 ) -> Result<(), String> {
     ensure_command_owner(&caller, &extension_id, &state)?;
     if let Some((_, win)) = get_window_for_owner(&app, &state, &extension_id, &window_id)? {
-        win.hide()
-            .map_err(|err| format!("failed to hide extension window: {err}"))?;
+        let label = win.label().to_string();
+        state.request_hide(&label);
+        apply_window_visibility(&app, &state, &label)?;
     }
     Ok(())
 }
@@ -566,8 +707,9 @@ pub fn extension_window_focus(
 ) -> Result<(), String> {
     ensure_command_owner(&caller, &extension_id, &state)?;
     if let Some((_, win)) = get_window_for_owner(&app, &state, &extension_id, &window_id)? {
-        win.set_focus()
-            .map_err(|err| format!("failed to focus extension window: {err}"))?;
+        let label = win.label().to_string();
+        state.request_show_and_focus(&label);
+        apply_window_visibility(&app, &state, &label)?;
     }
     Ok(())
 }
@@ -642,6 +784,27 @@ pub fn extension_window_set_position(
         win.set_position(LogicalPosition::new(x, y))
             .map_err(|err| format!("failed to set extension window position: {err}"))?;
     }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn extension_window_mark_ready(
+    app: AppHandle,
+    caller: WebviewWindow,
+    state: State<'_, ExtensionWindowState>,
+) -> Result<(), String> {
+    let label = caller.label();
+    if !is_extension_window_label(label) {
+        return Err("current window is not an extension window".to_string());
+    }
+
+    let Some((was_ready, _)) = state.mark_ready(label) else {
+        return Err("extension window ownership is not registered".to_string());
+    };
+    if !was_ready {
+        apply_window_visibility(&app, &state, label)?;
+    }
+
     Ok(())
 }
 

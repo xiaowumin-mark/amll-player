@@ -12,6 +12,7 @@ fn main() {
             "extension_window_set_title",
             "extension_window_set_size",
             "extension_window_set_position",
+            "extension_window_mark_ready",
             "extension_window_get_current",
             "extension_window_get_current_extension_files",
         ]));

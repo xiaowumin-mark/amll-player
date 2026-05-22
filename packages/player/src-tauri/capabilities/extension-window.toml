@@ -42,3 +42,5 @@ identifier = "allow-extension-window-set-title"
 identifier = "allow-extension-window-set-size"
 [[permissions]]
 identifier = "allow-extension-window-set-position"
+[[permissions]]
+identifier = "allow-extension-window-mark-ready"

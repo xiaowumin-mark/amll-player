@@ -50,6 +50,18 @@ type HostState =
 	| { status: "ready"; component: LoadedWindowComponent }
 	| { status: "error"; error: Error };
 
+function WindowReadySignal() {
+	useEffect(() => {
+		const timer = window.setTimeout(() => {
+			void invoke("extension_window_mark_ready").catch((err) => {
+				console.warn(EXTENSION_LOG_TAG, "标记扩展窗口就绪失败", err);
+			});
+		}, 0);
+		return () => window.clearTimeout(timer);
+	}, []);
+	return null;
+}
+
 async function cleanupLoadedContexts(contexts: PlayerExtensionContext[]) {
 	for (let index = contexts.length - 1; 0 <= index; index -= 1) {
 		const context = contexts[index];
@@ -326,7 +338,10 @@ const ExtensionWindowApp = () => {
 
 	if (state.status === "error") {
 		return (
-			<InfoPage title="Failed to load extension window" error={state.error} />
+			<>
+				<InfoPage title="Failed to load extension window" error={state.error} />
+				<WindowReadySignal />
+			</>
 		);
 	}
 
@@ -335,10 +350,14 @@ const ExtensionWindowApp = () => {
 		<Theme appearance="dark" panelBackground="solid" hasBackground={false}>
 			<ErrorBoundary
 				fallbackRender={(props) => (
-					<ComponentErrorPage {...props} current={current} />
+					<>
+						<ComponentErrorPage {...props} current={current} />
+						<WindowReadySignal />
+					</>
 				)}
 			>
 				<WindowComponent />
+				<WindowReadySignal />
 			</ErrorBoundary>
 		</Theme>
 	);

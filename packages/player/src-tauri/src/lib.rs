@@ -535,6 +535,8 @@ pub fn run() {
             #[cfg(desktop)]
             extension_window::extension_window_set_position,
             #[cfg(desktop)]
+            extension_window::extension_window_mark_ready,
+            #[cfg(desktop)]
             extension_window::extension_window_get_current,
             #[cfg(desktop)]
             extension_window::extension_window_get_current_extension_files,
